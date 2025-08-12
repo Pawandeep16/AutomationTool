@@ -327,19 +327,23 @@ export class ProvidenceAutomation {
       console.log('Manual Items page may have loaded, continuing...');
     }
   }
+
+
+  // manul items end
   
- async searchOrder(orderNumber: string): Promise<any> {
+  async searchOrder(orderNumber: string): Promise<any> {
     if (!this.driver) throw new Error('Driver not initialized');
     
     console.log(`Searching for order: ${orderNumber}`);
     
-    // Find search input
+    // Find search input using the exact selectors from your screenshots
     const searchSelectors = [
-      'input.ant-input.ant-input-lg.css-43bhvr',
       'input[placeholder*="Search code, order #, organization, customer"]',
-      'input[type="search"]',
+      'input.ant-input.ant-input-lg.css-43bhvr',
+      'input[autocapitalize="off"][type="search"]',
       '.ant-input-search input',
-      'input[placeholder*="search"]'
+      'input[placeholder*="search"]',
+      'input[type="search"]'
     ];
     
     let searchInput = null;
@@ -357,18 +361,49 @@ export class ProvidenceAutomation {
       throw new Error('Could not find search input field');
     }
     
-    // Clear and enter order number
+    // Clear the input field thoroughly
+    console.log('Clearing search input field...');
     await searchInput.clear();
-    await this.driver.sleep(500);
-    await searchInput.sendKeys(orderNumber);
-    await this.driver.sleep(1000);
+    await this.driver.sleep(300);
     
-    // Find and click search button
+    // Select all text and delete (backup clearing method)
+    await searchInput.sendKeys(Key.CONTROL, 'a');
+    await this.driver.sleep(200);
+    await searchInput.sendKeys(Key.DELETE);
+    await this.driver.sleep(300);
+    
+    // Verify field is empty
+    const currentValue = await searchInput.getAttribute('value');
+    if (currentValue && currentValue.trim() !== '') {
+      console.log(`Field still contains: "${currentValue}", clearing again...`);
+      await searchInput.clear();
+      await this.driver.sleep(300);
+    }
+    
+    // Enter the new order number
+    console.log(`Entering order number: ${orderNumber}`);
+    await searchInput.sendKeys(orderNumber);
+    await this.driver.sleep(800);
+    
+    // Verify the correct order number was entered
+    const enteredValue = await searchInput.getAttribute('value');
+    console.log(`Entered value: "${enteredValue}"`);
+    
+    if (enteredValue !== orderNumber) {
+      console.log('Value mismatch, clearing and re-entering...');
+      await searchInput.clear();
+      await this.driver.sleep(300);
+      await searchInput.sendKeys(orderNumber);
+      await this.driver.sleep(500);
+    }
+    
+    // Find and click search button using the exact selectors from your screenshots
     const searchButtonSelectors = [
       'button.ant-btn.css-43bhvr.ant-btn-default.ant-btn-color-default.ant-btn-variant-outlined.ant-btn-lg.ant-btn-icon-only.ant-input-search-button',
       '.ant-input-search-button',
-      'button[type="button"][class*="ant-input-search-button"]',
-      '.ant-input-group-addon button'
+      '.ant-input-group-addon button',
+      'button[type="button"][class*="search-button"]',
+      'span.ant-input-group-addon button'
     ];
     
     let searchButton = null;
@@ -387,12 +422,12 @@ export class ProvidenceAutomation {
       console.log('Clicked search button');
     } else {
       // Fallback to Enter key
-      await searchInput.sendKeys(Key.RETURN);
+      await searchInput.sendKeys(Key.ENTER);
       console.log('Used Enter key to search');
     }
     
     // Wait for search results
-    await this.driver.sleep(4000);
+    await this.driver.sleep(3000);
     
     // Extract order data from results
     return await this.extractOrderData();
@@ -405,7 +440,7 @@ export class ProvidenceAutomation {
     
     try {
       // Wait for results to load
-      await this.driver.wait(until.elementLocated(By.css('table, .ant-table-tbody')), 10000);
+      await this.driver.wait(until.elementLocated(By.css('table, .ant-table-tbody, .ant-table-row')), 8000);
       
       // Look for the table row with results
       const resultSelectors = [
@@ -428,7 +463,7 @@ export class ProvidenceAutomation {
       if (resultElement) {
         // Extract data from table cells
         const cells = await resultElement.findElements(By.css('td'));
-        console.log(`Found ${cells.length} cells in result row`);
+        console.log(`Found ${cells.length} cells in result row for order`);
         
         if (cells.length >= 2) {
           // Based on the table structure: Code, Location, Organization, Customer, Order #, Notes, Type, Date Created
@@ -438,7 +473,7 @@ export class ProvidenceAutomation {
           data.customer = cells.length > 3 ? await cells[3].getText() : '';
           data.orderNumber = cells.length > 4 ? await cells[4].getText() : '';
           
-          console.log('Extracted data:', data);
+          console.log(`Extracted data for order: Code=${data.code}, Location=${data.location}, Customer=${data.customer}`);
         }
       } else {
         console.log('No results found for this order');
@@ -446,7 +481,7 @@ export class ProvidenceAutomation {
       }
     } catch (error) {
       console.error('Error extracting order data:', error);
-      data.error = error instanceof Error ? error.message : 'Unknown error';
+      data.error = 'No results found or error extracting data';
     }
     
     return data;
@@ -456,7 +491,7 @@ export class ProvidenceAutomation {
   async keepBrowserOpen(): Promise<void> {
     if (!this.driver) throw new Error('Driver not initialized');
     
-    console.log('Browser will remain open for manual interaction...');
+    console.log('✅ Automation completed successfully! Browser will remain open for manual interaction...');
     // Don't close the driver - let user interact manually
   }
   

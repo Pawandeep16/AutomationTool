@@ -6,17 +6,17 @@ interface OrderRow {
 }
 
 export class GoogleSheetsService {
-  private sheets: any;
+  public sheets: any;
   
-  constructor() {
+ constructor() {
     const auth = new google.auth.GoogleAuth({
       credentials: {
         client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
         private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
       },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'], // Changed to allow read and write
     });
-    
+
     this.sheets = google.sheets({ version: 'v4', auth });
   }
   
@@ -156,93 +156,161 @@ export class GoogleSheetsService {
     
     return -1;
   }
-  
   async processSheet(googleSheetUrl: string): Promise<OrderRow[]> {
     const spreadsheetId = this.extractSpreadsheetId(googleSheetUrl);
-    
-    // For the test sheet, we'll use the first sheet directly
-    // In production, you might want to use getLatestDateSheet
+
+    console.log('=== PROCESSING GOOGLE SHEET ===');
+    console.log('Sheet URL:', googleSheetUrl);
+    console.log('Spreadsheet ID:', spreadsheetId);
+
+    // Get the first sheet
     const response = await this.sheets.spreadsheets.get({
       spreadsheetId,
       fields: 'sheets.properties.title',
     });
-    
+
     const sheets = response.data.sheets;
     if (!sheets || sheets.length === 0) {
       throw new Error('No sheets found in the spreadsheet');
     }
-    
+
     const sheetName = sheets[0].properties?.title || 'Sheet1';
-    const orders = await this.getOrderNumbers(spreadsheetId, sheetName);
-    
+    console.log('Using sheet:', sheetName);
+
+    // Get all data from the sheet
+    const dataResponse = await this.sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${sheetName}!A:M`, // A to M covers all columns shown in the image
+    });
+
+    const rows = dataResponse.data.values;
+    if (!rows || rows.length === 0) {
+      return [];
+    }
+
+    console.log(`Found ${rows.length} total rows (including header)`);
+
+    // Process the data - header is in row 0
+    const headerRow = rows[0];
+    console.log('Headers:', headerRow);
+
+    // Process orders based on the sheet structure from the image
+    const orders: OrderRow[] = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const orderNumber = row[4]?.toString().trim(); // Column E (Order Number)
+
+      if (orderNumber) {
+        const order: OrderRow = {
+          orderNumber: orderNumber,
+          vehicle: row[0] || '', // Column A
+          sequence: row[1] || '', // Column B  
+          route_number: row[2] || '', // Column C
+          route_name: row[3] || '', // Column D
+          locations: row[5] || '', // Column F
+          status: row[6] || '', // Column G
+          customer_name: row[7] || '', // Column H
+          customer_address: row[8] || '', // Column I
+          appointment_type: row[9] || '', // Column J
+          article_count: row[10] || '', // Column K
+        };
+
+        orders.push(order);
+      }
+    }
+
     console.log(`Found ${orders.length} orders in sheet "${sheetName}"`);
+
+    // Filter and log BoltYYZ3 orders
+    const boltOrders = orders.filter(order => 
+      order.orderNumber && order.orderNumber.toString().startsWith('BoltYYZ3')
+    );
+
+    console.log(`Found ${boltOrders.length} BoltYYZ3 orders:`);
+    boltOrders.forEach((order, index) => {
+      console.log(`${index + 1}. ${order.orderNumber} - ${order.customer_name} - ${order.customer_address}`);
+    });
+
     return orders;
   }
-  
+
   async updateLocationInSheet(googleSheetUrl: string, orderNumber: string, location: string): Promise<void> {
     const spreadsheetId = this.extractSpreadsheetId(googleSheetUrl);
-    
+
+    console.log(`=== UPDATING GOOGLE SHEET ===`);
+    console.log(`Order: ${orderNumber}`);
+    console.log(`Location: ${location}`);
+    console.log(`Sheet URL: ${googleSheetUrl}`);
+    console.log(`Spreadsheet ID: ${spreadsheetId}`);
+
     try {
       // Get the first sheet
       const response = await this.sheets.spreadsheets.get({
         spreadsheetId,
         fields: 'sheets.properties.title',
       });
-      
+
       const sheets = response.data.sheets;
       if (!sheets || sheets.length === 0) {
         throw new Error('No sheets found in the spreadsheet');
       }
-      
+
       const sheetName = sheets[0].properties?.title || 'Sheet1';
-      
+      console.log(`Using sheet: ${sheetName}`);
+
       // Get all data to find the row with this order number
       const dataResponse = await this.sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `${sheetName}!A:Z`,
+        range: `${sheetName}!A:M`, // A to M covers all columns as shown in the image
       });
-      
+
       const rows = dataResponse.data.values;
       if (!rows || rows.length === 0) {
         throw new Error('No data found in sheet');
       }
-      
-      // Find the header row and order number column
+
+      console.log(`Found ${rows.length} rows in sheet`);
+
+      // Based on the image: Column E = Order Number (index 4), Column F = Locations (index 5)
       const headerRow = rows[0];
-      const orderColumnIndex = headerRow.findIndex((header: string) => 
-        header && header.toLowerCase().includes('order')
-      );
-      const locationColumnIndex = headerRow.findIndex((header: string) => 
-        header && header.toLowerCase().includes('location')
-      );
-      
-      if (orderColumnIndex === -1) {
-        throw new Error('Order Number column not found');
-      }
-      
-      if (locationColumnIndex === -1) {
-        throw new Error('Locations column not found');
-      }
-      
+      console.log('Sheet headers:', headerRow);
+
+      const orderColumnIndex = 4; // Column E (Order Number)
+      const locationColumnIndex = 5; // Column F (Locations)
+
       // Find the row with this order number
       let targetRowIndex = -1;
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (row[orderColumnIndex] && row[orderColumnIndex].toString().trim() === orderNumber) {
+        const cellOrderNumber = row[orderColumnIndex]?.toString().trim();
+        console.log(`Row ${i + 1}: Checking "${cellOrderNumber}" against "${orderNumber}"`);
+
+        if (cellOrderNumber === orderNumber) {
           targetRowIndex = i + 1; // +1 because sheets are 1-indexed
+          console.log(`✅ Found order ${orderNumber} at row ${targetRowIndex}`);
           break;
         }
       }
-      
+
       if (targetRowIndex === -1) {
+        console.log(`❌ Order ${orderNumber} not found in sheet`);
+        console.log('Available orders in sheet:');
+        for (let i = 1; i < Math.min(rows.length, 10); i++) {
+          const row = rows[i];
+          const cellOrderNumber = row[orderColumnIndex]?.toString().trim();
+          console.log(`  Row ${i + 1}: "${cellOrderNumber}"`);
+        }
         throw new Error(`Order ${orderNumber} not found in sheet`);
       }
-      
-      // Update the location cell
-      const columnLetter = String.fromCharCode(65 + locationColumnIndex); // Convert to A, B, C, etc.
+
+      // Update the location cell (Column F)
+      const columnLetter = 'F'; // Locations column
       const range = `${sheetName}!${columnLetter}${targetRowIndex}`;
-      
-      await this.sheets.spreadsheets.values.update({
+
+      console.log(`📝 Updating range ${range} with location: "${location}"`);
+
+      const updateResponse = await this.sheets.spreadsheets.values.update({
         spreadsheetId,
         range,
         valueInputOption: 'RAW',
@@ -250,11 +318,12 @@ export class GoogleSheetsService {
           values: [[location]]
         }
       });
-      
-      console.log(`Updated ${orderNumber} location to: ${location}`);
-      
+
+      console.log(`✅ Successfully updated ${orderNumber} location to: "${location}" in range ${range}`);
+      console.log(`Update response:`, updateResponse.data);
+
     } catch (error) {
-      console.error('Error updating sheet:', error);
+      console.error('❌ Error updating sheet:', error);
       throw error;
     }
   }

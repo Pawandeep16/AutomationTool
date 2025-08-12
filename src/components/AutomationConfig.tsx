@@ -93,7 +93,7 @@ export default function AutomationConfig({ config, onConfigChange }: ConfigProps
             className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
           />
           <p className="text-xs text-slate-500 mt-1">
-            The Google Sheet containing BoltYYZ3 orders in column E
+            The Google Sheet containing BoltYYZ3 orders to update with locations
           </p>
         </div>
 

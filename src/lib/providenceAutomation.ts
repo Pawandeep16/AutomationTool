@@ -327,10 +327,7 @@ export class ProvidenceAutomation {
       console.log('Manual Items page may have loaded, continuing...');
     }
   }
-
-
-  // manul items end
-  
+ 
   async searchOrder(orderNumber: string): Promise<any> {
     if (!this.driver) throw new Error('Driver not initialized');
     
@@ -432,60 +429,72 @@ export class ProvidenceAutomation {
     // Extract order data from results
     return await this.extractOrderData();
   }
-  
   private async extractOrderData(): Promise<any> {
-    if (!this.driver) throw new Error('Driver not initialized');
+  if (!this.driver) throw new Error('Driver not initialized');
+  
+  const data: any = {};
+  
+  try {
+    // Wait for results to load
+    await this.driver.wait(until.elementLocated(By.css('.ant-table-tbody tr.ant-table-row')), 8000);
     
-    const data: any = {};
+    // Look for the first table row with results
+    const resultElement = await this.driver.findElement(By.css('.ant-table-tbody tr.ant-table-row'));
     
-    try {
-      // Wait for results to load
-      await this.driver.wait(until.elementLocated(By.css('table, .ant-table-tbody, .ant-table-row')), 8000);
+    if (resultElement) {
+      // Extract data from table cells - Code, Location, Organization, Customer, Order
+      const cells = await resultElement.findElements(By.css('td'));
+      console.log(`Found ${cells.length} cells in result row for order`);
       
-      // Look for the table row with results
-      const resultSelectors = [
-        'table tbody tr:first-child',
-        '.ant-table-tbody tr:first-child',
-        'tr.ant-table-row'
-      ];
-      
-      let resultElement = null;
-      for (const selector of resultSelectors) {
-        try {
-          resultElement = await this.driver.findElement(By.css(selector));
-          console.log(`Found result row with selector: ${selector}`);
-          break;
-        } catch (e) {
-          continue;
-        }
-      }
-      
-      if (resultElement) {
-        // Extract data from table cells
-        const cells = await resultElement.findElements(By.css('td'));
-        console.log(`Found ${cells.length} cells in result row for order`);
+      if (cells.length >= 5) {
+        data.code = await cells[0].getText();
+        data.organization = await cells[2].getText();
+        data.customer = await cells[3].getText();
+        data.order = await cells[4].getText();
         
-        if (cells.length >= 2) {
-          // Based on the table structure: Code, Location, Organization, Customer, Order #, Notes, Type, Date Created
-          data.code = cells.length > 0 ? await cells[0].getText() : '';
-          data.location = cells.length > 1 ? await cells[1].getText() : '';
-          data.organization = cells.length > 2 ? await cells[2].getText() : '';
-          data.customer = cells.length > 3 ? await cells[3].getText() : '';
-          data.orderNumber = cells.length > 4 ? await cells[4].getText() : '';
+        // Extract location from the second column (Location column)
+        const locationCell = cells[1];
+        try {
+          // Look for <a> tag with href in the location cell
+          const locationLink = await locationCell.findElement(By.css('a[href*="/locations/"]'));
+          const hrefValue = await locationLink.getAttribute('href');
+          const locationText = await locationLink.getText();
           
-          console.log(`Extracted data for order: Code=${data.code}, Location=${data.location}, Customer=${data.customer}`);
+          if (hrefValue && locationText) {
+            data.location = locationText.trim();
+            data.locationHref = hrefValue;
+            console.log(`✅ Found location link: ${data.location} (href: ${data.locationHref})`);
+          } else {
+            throw new Error('Link found but no href or text');
+          }
+        } catch (linkError) {
+          // Fallback to cell text if no link is found
+          const cellText = await locationCell.getText();
+          if (cellText && cellText.trim() !== '') {
+            data.location = cellText.trim();
+            console.log(`✅ Found location text: ${data.location}`);
+          } else {
+            console.log('❌ No location found in cell');
+            data.error = 'No location found';
+          }
         }
+        
+        console.log(`Extracted data: Code=${data.code}, Location=${data.location}, Organization=${data.organization}, Customer=${data.customer}, Order=${data.order}`);
       } else {
-        console.log('No results found for this order');
-        data.error = 'No results found';
+        console.log('❌ Insufficient cells found in row');
+        data.error = 'Insufficient data in row';
       }
-    } catch (error) {
-      console.error('Error extracting order data:', error);
-      data.error = 'No results found or error extracting data';
+    } else {
+      console.log('No results found for this order');
+      data.error = 'No results found';
     }
-    
-    return data;
+  } catch (error) {
+    console.error('Error extracting order data:', error);
+    data.error = 'Error extracting data';
   }
+  
+  return data;
+}
   
   // Keep browser open for manual interaction
   async keepBrowserOpen(): Promise<void> {

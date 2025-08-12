@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
               { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'pending' },
               { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'pending' },
               { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'pending' },
-              { id: 'search-orders', title: 'Search Orders', description: 'Searching each BoltYYZ3 order in Manual Items', status: 'pending' },
+              { id: 'process-orders', title: 'Process Orders', description: 'Searching orders and updating locations', status: 'pending' },
               { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
             ]
           })}\n\n`));
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
               { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'pending' },
               { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'pending' },
               { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'pending' },
-              { id: 'search-orders', title: 'Search Orders', description: 'Searching each BoltYYZ3 order in Manual Items', status: 'pending' },
+              { id: 'process-orders', title: 'Process Orders', description: 'Searching orders and updating locations', status: 'pending' },
               { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
             ]
           })}\n\n`));
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
               { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'pending' },
               { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'pending' },
               { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'pending' },
-              { id: 'search-orders', title: 'Search Orders', description: 'Searching each BoltYYZ3 order in Manual Items', status: 'pending' },
+              { id: 'process-orders', title: 'Process Orders', description: 'Searching orders and updating locations', status: 'pending' },
               { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
             ]
           })}\n\n`));
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
               { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'pending' },
               { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'pending' },
               { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'pending' },
-              { id: 'search-orders', title: 'Search Orders', description: 'Searching each BoltYYZ3 order in Manual Items', status: 'pending' },
+              { id: 'process-orders', title: 'Process Orders', description: 'Searching orders and updating locations', status: 'pending' },
               { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
             ]
          })}\n\n`));
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
              { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'running' },
              { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'pending' },
              { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'pending' },
-             { id: 'search-orders', title: 'Search Orders', description: 'Searching each BoltYYZ3 order in Manual Items', status: 'pending' },
+             { id: 'process-orders', title: 'Process Orders', description: 'Searching orders and updating locations', status: 'pending' },
              { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
            ]
          })}\n\n`));
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
              { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'completed' },
              { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'running' },
              { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'pending' },
-             { id: 'search-orders', title: 'Search Orders', description: 'Searching each BoltYYZ3 order in Manual Items', status: 'pending' },
+             { id: 'process-orders', title: 'Process Orders', description: 'Searching orders and updating locations', status: 'pending' },
              { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
            ]
         })}\n\n`));
@@ -158,12 +158,12 @@ export async function POST(request: NextRequest) {
             { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'completed' },
             { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'completed' },
             { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'running' },
-            { id: 'search-orders', title: 'Search Orders', description: 'Searching each BoltYYZ3 order in Manual Items', status: 'pending' },
+            { id: 'process-orders', title: 'Process Orders', description: 'Searching orders and updating locations', status: 'pending' },
             { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
           ]
         })}\n\n`));
         
-        // Initialize Google Sheets service and fetch BoltYYZ3 orders
+        // Initialize Google Sheets service
         const sheetsService = new GoogleSheetsService();
         const allOrders = await sheetsService.processSheet(googleSheetUrl);
         
@@ -172,13 +172,13 @@ export async function POST(request: NextRequest) {
           order.orderNumber && order.orderNumber.toString().startsWith('BoltYYZ3')
         );
         
-        console.log(`Found ${boltOrders.length} BoltYYZ3 orders to search`);
+        console.log(`Found ${boltOrders.length} BoltYYZ3 orders to process`);
         
-        // Step 8: Search Orders
-        currentProcessingStepId = 'search-orders';
+        // Step 8: Process Orders
+        currentProcessingStepId = 'process-orders';
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           isRunning: true,
-          currentStepId: 'search-orders',
+          currentStepId: 'process-orders',
           steps: [
             { id: 'initialize', title: 'Initialize Browser', description: 'Starting Chrome browser and preparing automation', status: 'completed' },
             { id: 'navigate', title: 'Navigate to Providence', description: 'Opening https://providence.gobolt.com/login', status: 'completed' },
@@ -187,49 +187,125 @@ export async function POST(request: NextRequest) {
             { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'completed' },
             { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'completed' },
             { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'completed' },
-            { id: 'search-orders', title: 'Search Orders', description: `Searching ${boltOrders.length} BoltYYZ3 orders`, status: 'running' },
+            { id: 'process-orders', title: 'Process Orders', description: `Processing ${boltOrders.length} BoltYYZ3 orders`, status: 'running' },
             { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
           ]
         })}\n\n`));
         
-        // Search each BoltYYZ3 order
+        // Process each BoltYYZ3 order
         const results: ProcessingResult[] = [];
         
-        for (let i = 0; i < boltOrders.length; i++) {
+        for (let i = 0; i < Math.min(boltOrders.length, 5); i++) { // Process first 5 orders for testing
           const order = boltOrders[i];
           const orderNumber = order.orderNumber.toString();
           
           try {
-            console.log(`Searching order ${i + 1}/${boltOrders.length}: ${orderNumber}`);
+            console.log(`Processing order ${i + 1}/${boltOrders.length}: ${orderNumber}`);
+            
+            // Update progress
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              isRunning: true,
+              currentStepId: 'process-orders',
+              steps: [
+                { id: 'initialize', title: 'Initialize Browser', description: 'Starting Chrome browser and preparing automation', status: 'completed' },
+                { id: 'navigate', title: 'Navigate to Providence', description: 'Opening https://providence.gobolt.com/login', status: 'completed' },
+                { id: 'login', title: 'Login to Providence', description: 'Entering credentials and logging in', status: 'completed' },
+                { id: 'facility', title: 'Select Facility', description: 'Selecting YYZ5 from facility dropdown', status: 'completed' },
+                { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'completed' },
+                { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'completed' },
+                { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'completed' },
+                { id: 'process-orders', title: 'Process Orders', description: `Processing ${orderNumber} (${i + 1}/${boltOrders.length})`, status: 'running' },
+                { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
+              ],
+              results: [...results, { orderNumber, status: 'processing' as const }]
+            })}\n\n`));
             
             // Search for the order
             const orderData = await automation.searchOrder(orderNumber);
             
-            if (orderData.location && !orderData.error) {
-              results.push({
+            console.log(`Order data for ${orderNumber}:`, orderData);
+            
+            if (orderData.location && orderData.location.trim() !== '' && !orderData.error) {
+              // Update the Google Sheet with the location
+              console.log(`Updating Google Sheet for order ${orderNumber} with location: ${orderData.location}`);
+              
+              try {
+                await sheetsService.updateLocationInSheet(googleSheetUrl, orderNumber, orderData.location);
+                console.log(`✅ Successfully updated sheet for ${orderNumber}`);
+              } catch (sheetError) {
+                console.error(`❌ Failed to update sheet for ${orderNumber}:`, sheetError);
+                throw sheetError;
+              }
+              
+              const result: ProcessingResult = {
                 orderNumber,
                 status: 'success',
-                message: 'Order found successfully',
+                message: 'Location updated successfully',
                 location: orderData.location
-              });
+              };
+              
+              results.push(result);
+              
+              // Update progress with successful result
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                isRunning: true,
+                currentStepId: 'process-orders',
+                steps: [
+                  { id: 'initialize', title: 'Initialize Browser', description: 'Starting Chrome browser and preparing automation', status: 'completed' },
+                  { id: 'navigate', title: 'Navigate to Providence', description: 'Opening https://providence.gobolt.com/login', status: 'completed' },
+                  { id: 'login', title: 'Login to Providence', description: 'Entering credentials and logging in', status: 'completed' },
+                  { id: 'facility', title: 'Select Facility', description: 'Selecting YYZ5 from facility dropdown', status: 'completed' },
+                  { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'completed' },
+                  { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'completed' },
+                  { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'completed' },
+                  { id: 'process-orders', title: 'Process Orders', description: `✅ Updated ${orderNumber} (${i + 1}/${Math.min(boltOrders.length, 5)})`, status: 'running' },
+                  { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'pending' }
+                ],
+                results: results
+              })}\n\n`));
             } else {
-              results.push({
+              // Handle case where no location is found
+              const errorMessage = orderData.error || 'No location found';
+              console.log(`❌ No location found for ${orderNumber}: ${errorMessage}`);
+              
+              // Still try to update the sheet with "No location" if the order exists
+              try {
+                await sheetsService.updateLocationInSheet(googleSheetUrl, orderNumber, 'No location');
+                console.log(`✅ Updated sheet for ${orderNumber} with "No location"`);
+              } catch (sheetError) {
+                console.error(`❌ Failed to update sheet for ${orderNumber}:`, sheetError);
+              }
+              
+              const result: ProcessingResult = {
                 orderNumber,
                 status: 'error',
-                message: orderData.error || 'Order not found'
-              });
+                message: errorMessage
+              };
+              
+              results.push(result);
             }
             
             // Small delay between searches
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            await new Promise(resolve => setTimeout(resolve, 4000)); // Increased delay for sheet updates
             
           } catch (error) {
-            console.error(`Error searching order ${orderNumber}:`, error);
-            results.push({
+            console.error(`Error processing order ${orderNumber}:`, error);
+            
+            // Try to update sheet with error status
+            try {
+              await sheetsService.updateLocationInSheet(googleSheetUrl, orderNumber, 'Error');
+              console.log(`✅ Updated sheet for ${orderNumber} with "Error"`);
+            } catch (sheetError) {
+              console.error(`❌ Failed to update sheet for ${orderNumber}:`, sheetError);
+            }
+            
+            const result: ProcessingResult = {
               orderNumber,
               status: 'error',
               message: error instanceof Error ? error.message : 'Unknown error occurred'
-            });
+            };
+            
+            results.push(result);
           }
         }
         
@@ -246,14 +322,14 @@ export async function POST(request: NextRequest) {
             { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab', status: 'completed' },
             { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section', status: 'completed' },
             { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet', status: 'completed' },
-            { id: 'search-orders', title: 'Search Orders', description: `Searched ${results.length} orders successfully`, status: 'completed' },
+            { id: 'process-orders', title: 'Process Orders', description: `Processed ${results.length} orders successfully`, status: 'completed' },
             { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully', status: 'completed' }
           ],
           results: results
         })}\n\n`));
         
-        // Keep browser open for manual interaction after automation
-        console.log('Automation completed successfully. Browser remains open for manual interaction.');
+        // Keep browser open for manual interaction
+        // Don't close the automation here
         
       } catch (error) {
         console.error('Automation error:', error);
@@ -267,13 +343,13 @@ export async function POST(request: NextRequest) {
           { id: 'inventory', title: 'Navigate to Inventory Management', description: 'Clicking on Inventory Management tab' },
           { id: 'manual-items', title: 'Open Manual Items', description: 'Clicking on Manual Items section' },
           { id: 'read-sheet', title: 'Read Google Sheet', description: 'Fetching BoltYYZ3 orders from Google Sheet' },
-          { id: 'search-orders', title: 'Search Orders', description: 'Searching each BoltYYZ3 order in Manual Items' },
+          { id: 'process-orders', title: 'Process Orders', description: 'Searching orders and updating locations' },
           { id: 'complete', title: 'Automation Complete', description: 'All steps completed successfully' }
         ];
         
         const errorSteps = allSteps.map(step => {
           if (step.id === currentProcessingStepId) {
-            return { ...step, status: 'error' };
+            return { ...step, status: 'error', error: error instanceof Error ? error.message : 'Unknown error' };
           } else if (allSteps.findIndex(s => s.id === currentProcessingStepId) > allSteps.findIndex(s => s.id === step.id)) {
             return { ...step, status: 'completed' };
           } else {
@@ -284,9 +360,11 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           isRunning: false,
           currentStepId: currentProcessingStepId,
-          error: error instanceof Error ? error.message : 'Unknown error occurred',
-          steps: errorSteps
+          steps: errorSteps,
+          error: error instanceof Error ? error.message : 'Unknown error occurred'
         })}\n\n`));
+        
+
       } finally {
         controller.close();
       }

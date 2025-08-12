@@ -235,59 +235,53 @@ export class GoogleSheetsService {
     return orders;
   }
 
-  async updateLocationInSheet(googleSheetUrl: string, orderNumber: string, location: string): Promise<void> {
+
+  async updateLocationInSheet(googleSheetUrl: string, orderNumber: string, locations: string[]): Promise<void> {
     const spreadsheetId = this.extractSpreadsheetId(googleSheetUrl);
 
     console.log(`=== UPDATING GOOGLE SHEET ===`);
     console.log(`Order: ${orderNumber}`);
-    console.log(`Location: ${location}`);
+    console.log(`Locations: ${locations.join(', ') || 'No locations'}`);
     console.log(`Sheet URL: ${googleSheetUrl}`);
     console.log(`Spreadsheet ID: ${spreadsheetId}`);
 
     try {
-      // Get the first sheet
       const response = await this.sheets.spreadsheets.get({
         spreadsheetId,
         fields: 'sheets.properties.title',
       });
 
       const sheets = response.data.sheets;
-      if (!sheets || sheets.length === 0) {
-        throw new Error('No sheets found in the spreadsheet');
-      }
+      if (!sheets || sheets.length === 0) throw new Error('No sheets found in the spreadsheet');
 
       const sheetName = sheets[0].properties?.title || 'Sheet1';
       console.log(`Using sheet: ${sheetName}`);
 
-      // Get all data to find the row with this order number
       const dataResponse = await this.sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: `${sheetName}!A:M`, // A to M covers all columns as shown in the image
+        range: `${sheetName}!A:M`,
       });
 
-      const rows = dataResponse.data.values;
-      if (!rows || rows.length === 0) {
-        throw new Error('No data found in sheet');
-      }
+      const rows = dataResponse.data.values || [];
+      if (rows.length === 0) throw new Error('No data found in sheet');
 
       console.log(`Found ${rows.length} rows in sheet`);
-
-      // Based on the image: Column E = Order Number (index 4), Column F = Locations (index 5)
       const headerRow = rows[0];
       console.log('Sheet headers:', headerRow);
 
       const orderColumnIndex = 4; // Column E (Order Number)
       const locationColumnIndex = 5; // Column F (Locations)
 
-      // Find the row with this order number
       let targetRowIndex = -1;
+      let originalRowData: string[] = [];
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         const cellOrderNumber = row[orderColumnIndex]?.toString().trim();
         console.log(`Row ${i + 1}: Checking "${cellOrderNumber}" against "${orderNumber}"`);
 
         if (cellOrderNumber === orderNumber) {
-          targetRowIndex = i + 1; // +1 because sheets are 1-indexed
+          targetRowIndex = i + 1; // 1-indexed
+          originalRowData = [...row]; // Store the entire original row
           console.log(`✅ Found order ${orderNumber} at row ${targetRowIndex}`);
           break;
         }
@@ -295,33 +289,79 @@ export class GoogleSheetsService {
 
       if (targetRowIndex === -1) {
         console.log(`❌ Order ${orderNumber} not found in sheet`);
-        console.log('Available orders in sheet:');
-        for (let i = 1; i < Math.min(rows.length, 10); i++) {
-          const row = rows[i];
-          const cellOrderNumber = row[orderColumnIndex]?.toString().trim();
-          console.log(`  Row ${i + 1}: "${cellOrderNumber}"`);
-        }
         throw new Error(`Order ${orderNumber} not found in sheet`);
       }
 
-      // Update the location cell (Column F)
-      const columnLetter = 'F'; // Locations column
-      const range = `${sheetName}!${columnLetter}${targetRowIndex}`;
+      // Handle no locations case
+      if (locations.length === 0) {
+        const range = `${sheetName}!F${targetRowIndex}`;
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range,
+          valueInputOption: 'RAW',
+          requestBody: { values: [['No location']] }
+        });
+        console.log(`✅ Updated ${orderNumber} with "No location" in range ${range}`);
+        return;
+      }
 
-      console.log(`📝 Updating range ${range} with location: "${location}"`);
-
-      const updateResponse = await this.sheets.spreadsheets.values.update({
+      // Update the original row with the first location, preserving other data
+      const firstLocationRange = `${sheetName}!F${targetRowIndex}`;
+      await this.sheets.spreadsheets.values.update({
         spreadsheetId,
-        range,
+        range: firstLocationRange,
         valueInputOption: 'RAW',
-        requestBody: {
-          values: [[location]]
-        }
+        requestBody: { values: [[locations[0]]] }
       });
+      console.log(`✅ Updated first location "${locations[0]}" in range ${firstLocationRange}`);
 
-      console.log(`✅ Successfully updated ${orderNumber} location to: "${location}" in range ${range}`);
-      console.log(`Update response:`, updateResponse.data);
+      // Insert new rows for additional locations
+      if (locations.length > 1) {
+        const numNewRows = locations.length - 1;
+        const requests = [];
 
+        for (let i = 1; i < locations.length; i++) {
+          // Insert a new row below the current target (shifts down each time)
+          requests.push({
+            insertDimension: {
+              range: {
+                sheetId: sheets[0].properties.sheetId,
+                dimension: 'ROWS',
+                startIndex: targetRowIndex + i - 1,
+                endIndex: targetRowIndex + i
+              },
+              inheritFromBefore: true // Inherit formatting from above
+            }
+          });
+
+          // Prepare new row data: copy order number, set location, blank other columns
+          const newRowData = originalRowData.map((cell, idx) => {
+            if (idx === orderColumnIndex) return orderNumber; // Retain order number
+            if (idx === locationColumnIndex) return locations[i]; // Set new location
+            return ''; // Blank other columns
+          });
+
+          requests.push({
+            updateCells: {
+              range: {
+                sheetId: sheets[0].properties.sheetId,
+                startRowIndex: targetRowIndex + i - 1,
+                endRowIndex: targetRowIndex + i,
+                startColumnIndex: 0,
+                endColumnIndex: originalRowData.length
+              },
+              rows: [{ values: newRowData.map(v => ({ userEnteredValue: { stringValue: v } })) }],
+              fields: 'userEnteredValue'
+            }
+          });
+        }
+
+        await this.sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: { requests }
+        });
+        console.log(`✅ Inserted ${numNewRows} new rows with additional locations for ${orderNumber}`);
+      }
     } catch (error) {
       console.error('❌ Error updating sheet:', error);
       throw error;
